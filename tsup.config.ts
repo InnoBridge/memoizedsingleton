@@ -9,7 +9,8 @@ export default defineConfig({
   treeshake: true,
   cjsInterop: true,
   sourcemap: true,
-
+  target: 'es2020', // Compatible with Node.js 14+ and modern browsers
+  
   // add your alias here:
   esbuildOptions(options) {
     options.alias = {
