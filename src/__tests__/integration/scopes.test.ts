@@ -91,7 +91,7 @@ const testModifyingInstance = () => {
 (async function main() {
     try {
         console.log('🚀 Starting Singleton Integration Tests\n');
-        console.log('=' .repeat(50));
+        console.log('='.repeat(50));
 
         testSingletonBehavior();
         testApplicationContext();

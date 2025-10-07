@@ -25,7 +25,7 @@ const Singleton = <T, C extends new(...a:any[]) => T>(Target: C): any => {
       }
 
       // Call SingletonComponent constructor with args (this sets scope = 'SINGLETON')
-      super(args);
+      super(...args);
 
       // Now we need to initialize the Target's instance properties
       // Create a temporary instance to get its properties
