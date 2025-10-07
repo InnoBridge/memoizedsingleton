@@ -14,9 +14,7 @@ const getApplicationContext = <T>(className: Constructor<T>): (T & Component) | 
 };
 
 const clearApplicationContext = (className: Constructor): void => {
-    console.log("Context container before deletion:", contextContainer);
     contextContainer.delete(className);
-    console.log("Context container after deletion:", contextContainer);
 };
 
 export {
