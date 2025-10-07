@@ -1,10 +1,14 @@
 import { getApplicationContext, setApplicationContext } from '@/application-context/application_context';
-import { SingletonComponent } from '@/building-blocks/component';
+import { Component, SingletonComponent } from '@/building-blocks/component';
 
 /**
  * Singleton decorator - makes the target class extend SingletonComponent
  * and ensures only one instance exists. The SingletonComponent constructor
  * will be called, setting scope = 'SINGLETON'.
+ * 
+ * Note: Due to TypeScript limitations, the decorator cannot change the type
+ * of the class at compile time. The instance will have Component methods at runtime,
+ * but TypeScript won't know about them unless you use a type assertion:
  * 
  * @example
  * @Singleton
@@ -13,13 +17,17 @@ import { SingletonComponent } from '@/building-blocks/component';
  *     console.log('MyService created');
  *   }
  * }
+ * 
+ * // Type assertion needed to access Component methods:
+ * const instance = new MyService() as MyService & Component;
+ * instance.getScope(); // Now TypeScript knows about this
  */
-const Singleton = <T, C extends new(...a:any[]) => T>(Target: C): any => {
+function Singleton<T, C extends new(...a:any[]) => T>(Target: C): C {
   // Create a new class that extends SingletonComponent
   const Decorated = class extends SingletonComponent {
     constructor(...args: any[]) {
       // Check for existing singleton instance first
-      const existing = getApplicationContext<any>(Decorated as any);
+      const existing = getApplicationContext(Decorated as any);
       if (existing) {
         return existing as any;
       }
@@ -37,7 +45,7 @@ const Singleton = <T, C extends new(...a:any[]) => T>(Target: C): any => {
       });
 
       // Store the singleton instance
-      setApplicationContext(this as unknown as object, Decorated as any);
+      setApplicationContext(this as unknown as Component, Decorated as any);
     }
   };
 
@@ -60,7 +68,7 @@ const Singleton = <T, C extends new(...a:any[]) => T>(Target: C): any => {
     }
   });
 
-  return Decorated;
+  return Decorated as any as C;
 };
 
 export {

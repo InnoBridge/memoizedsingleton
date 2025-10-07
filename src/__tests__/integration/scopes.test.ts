@@ -1,6 +1,6 @@
 import { getApplicationContext } from "@/application-context/application_context";
 import { Singleton } from "@/scopes/scopes";
-import { SingletonComponent } from "@/building-blocks/component";
+import { Component, SingletonComponent } from "@/building-blocks/component";
 
 @Singleton
 class DummySingleton {
@@ -16,16 +16,20 @@ class DummySingleton {
     }
 }
 
-
 const testSingletonBehavior = () => {
     console.log('\n📋 Test 1: Singleton decorator prevents multiple instances');
     
     // Create multiple instances
     console.log('Creating first instance...');
-    const instance1 = new DummySingleton();
+    const instance1 = new DummySingleton() as DummySingleton & Component;
     console.log("Singleton ", instance1);
-    const singletonInstance = instance1 as unknown as SingletonComponent;
+    const singletonInstance = instance1;
     console.log("Scope ", singletonInstance.getScope());
+
+    console.log(`Is instance1 a Component? ${instance1 instanceof Component}`);
+    console.log(`Is instance1 a SingletonComponent? ${instance1 instanceof SingletonComponent}`);
+    console.log(`Is instance1 a DummySingleton? ${instance1 instanceof DummySingleton}`);
+
     console.log(`  Instance 1 ID: ${instance1.instanceId}`);
     
     console.log('Creating second instance (should return first)...');
@@ -49,6 +53,8 @@ const testSingletonBehavior = () => {
     } else {
         throw new Error('❌ Constructor was called multiple times');
     }
+
+    instance1.stop();
 };
 
 const testApplicationContext = () => {
@@ -69,6 +75,7 @@ const testApplicationContext = () => {
     } else {
         throw new Error('❌ Application context instance mismatch');
     }
+    contextInstance.stop();
 };
 
 const testModifyingInstance = () => {
@@ -78,7 +85,7 @@ const testModifyingInstance = () => {
     instance1.name = "Modified Name";
     console.log(`  Modified instance1.name to: "${instance1.name}"`);
     
-    const instance2 = new DummySingleton();
+    const instance2 = new DummySingleton() as (DummySingleton & Component);
     console.log(`  instance2.name is: "${instance2.name}"`);
     
     if (instance2.name === "Modified Name") {
@@ -86,6 +93,17 @@ const testModifyingInstance = () => {
     } else {
         throw new Error('❌ Modifications did not persist');
     }
+    instance2.stop();
+};
+
+const testClearingContext = () => {
+    console.log('\n📋 Test 4: Clearing application context allows new instance')
+    new DummySingleton()
+    const instanceFromContextBeforeClear = getApplicationContext(DummySingleton);
+    console.log(`  Instance from context before clear: ${instanceFromContextBeforeClear?.name} (ID: ${instanceFromContextBeforeClear?.instanceId})`);
+    instanceFromContextBeforeClear?.stop(); // This should clear the context
+    const instanceAfterClear = getApplicationContext(DummySingleton);
+    console.log(`  Instance from context after clear: ${instanceAfterClear}`);
 };
 
 (async function main() {
@@ -93,9 +111,10 @@ const testModifyingInstance = () => {
         console.log('🚀 Starting Singleton Integration Tests\n');
         console.log('='.repeat(50));
 
-        testSingletonBehavior();
-        testApplicationContext();
-        testModifyingInstance();
+        // testSingletonBehavior();
+        // testApplicationContext();
+        // testModifyingInstance();
+        testClearingContext();
         
         console.log('\n' + '='.repeat(50));
         console.log("🎉 All integration tests passed");

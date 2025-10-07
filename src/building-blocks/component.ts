@@ -1,3 +1,5 @@
+import { clearApplicationContext } from '@/application-context/application_context';
+
 type Scope = 'SINGLETON' | 'TRANSIENT' | 'REQUEST';
 
 class Component {
@@ -11,13 +13,13 @@ class Component {
     return this.#scope;
   }
 
-//   start(): void {
-    // startup logic
-//   }
+  stop(): void {
+    clearApplicationContext(this.constructor as any);
+  }
 
-//   stop(): void {
-    // cleanup logic
-//   }
+  replace(): void {
+    // Default no-op
+  }
 };
 
 class SingletonComponent extends Component {
