@@ -98,7 +98,7 @@ const testModifyingInstance = () => {
 
 const testClearingContext = () => {
     console.log('\n📋 Test 4: Clearing application context allows new instance')
-    new DummySingleton()
+    new DummySingleton();
     const instanceFromContextBeforeClear = getApplicationContext(DummySingleton);
     console.log(`  Instance from context before clear: ${instanceFromContextBeforeClear?.name} (ID: ${instanceFromContextBeforeClear?.instanceId})`);
     instanceFromContextBeforeClear?.stop(); // This should clear the context
