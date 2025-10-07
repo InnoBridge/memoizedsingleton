@@ -111,9 +111,9 @@ const testClearingContext = () => {
         console.log('🚀 Starting Singleton Integration Tests\n');
         console.log('='.repeat(50));
 
-        // testSingletonBehavior();
-        // testApplicationContext();
-        // testModifyingInstance();
+        testSingletonBehavior();
+        testApplicationContext();
+        testModifyingInstance();
         testClearingContext();
         
         console.log('\n' + '='.repeat(50));

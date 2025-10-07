@@ -1,6 +1,8 @@
-import { clearApplicationContext } from '@/application-context/application_context';
+import { clearApplicationContext, setApplicationContext } from '@/application-context/application_context';
 
 type Scope = 'SINGLETON' | 'TRANSIENT' | 'REQUEST';
+
+type Constructor<T = any> = new (...args: any[]) => T;
 
 class Component {
   #scope: Scope | undefined;
@@ -14,11 +16,18 @@ class Component {
   }
 
   stop(): void {
-    clearApplicationContext(this.constructor as any);
+    clearApplicationContext(this.constructor as Constructor);
   }
 
-  replace(): void {
-    // Default no-op
+  replace<T extends Component>(this: T, newInstance: T): T {
+    // Remove the current instance from the context
+    clearApplicationContext(this.constructor as Constructor);
+    
+    // Add the new instance to the context
+    setApplicationContext(newInstance, this.constructor as Constructor);
+    
+    // Return the new instance
+    return newInstance;
   }
 };
 
