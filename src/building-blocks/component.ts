@@ -1,4 +1,4 @@
-import { clearApplicationContext, setApplicationContext } from '@/application-context/application_context';
+import { removeComponentFromApplicationContext, setApplicationContext } from '@/application-context/application_context';
 
 enum Scope {
   SINGLETON = 'SINGLETON',
@@ -20,12 +20,12 @@ class Component {
   }
 
   stop(): void {
-    clearApplicationContext(this.constructor as Constructor);
+    removeComponentFromApplicationContext(this.constructor as Constructor);
   }
 
   replace<T extends Component>(this: T, newInstance: T): T {
     // Remove the current instance from the context
-    clearApplicationContext(this.constructor as Constructor);
+    removeComponentFromApplicationContext(this.constructor as Constructor);
     
     // Add the new instance to the context
     setApplicationContext(newInstance, this.constructor as Constructor);

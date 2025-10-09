@@ -205,7 +205,7 @@ const testReturnSameInstanceWithinSingleRequest = async () => {
     assert.strictEqual(data.sameInstance, true);
     assert.deepStrictEqual(data.logs, ['First log', 'Second log', 'Third log']);
     
-    console.log('✅ textReturnSameInstanceWithinSingleRequest passed');
+    console.log('✅ testReturnSameInstanceWithinSingleRequest passed');
     console.log('----------------------------------------------\n');
 };
 
