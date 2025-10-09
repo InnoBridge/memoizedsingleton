@@ -2,8 +2,7 @@ import { getApplicationContext, setApplicationContext } from '@/application-cont
 import { 
     Component, 
     SingletonComponent,
-    RequestComponent,
-    Scope
+    RequestComponent
 } from '@/building-blocks/component';
 
 /**

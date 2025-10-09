@@ -3,7 +3,6 @@ import { strict as assert } from 'node:assert';
 import { Request as RequestScoped } from '@/scopes/scopes';
 import { getApplicationContext, initializeRequestContext } from '@/application-context/application_context';
 import { Component, Scope } from '@/building-blocks/component';
-import { b } from 'vitest/dist/chunks/suite.d.FvehnV49.js';
 
 const BASEURL = 'http://localhost';
 const PORT = 3456;
