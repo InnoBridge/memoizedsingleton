@@ -36,7 +36,9 @@
     "test:integration": "npx tsx src/__tests__/integration/${npm_config_file:-*.test.ts}"
   },
   "devDependencies": {
+    "@types/express": "^5.0.3",
     "@types/node": "^22.15.29",
+    "express": "^5.1.0",
     "rimraf": "^6.0.1",
     "tsup": "^8.3.6",
     "typescript": "^5.7.3",
