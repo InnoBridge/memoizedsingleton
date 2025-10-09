@@ -49,6 +49,13 @@ const Singleton = <T, C extends new(...a:any[]) => T>(Target: C): C => {
     }
   };
 
+  // Set the class name to match the original Target
+  Object.defineProperty(Decorated, 'name', {
+    value: Target.name,
+    writable: false,
+    configurable: true
+  });
+
   // Copy all prototype methods from Target to Decorated
   // This ensures methods defined in Target are available
   Object.getOwnPropertyNames(Target.prototype).forEach(name => {
@@ -152,6 +159,13 @@ const Request = <T, C extends new(...a:any[]) => T>(Target: C): C => {
       setApplicationContext(this as unknown as Component, Decorated as any);
     }
   };
+
+  // Set the class name to match the original Target
+  Object.defineProperty(Decorated, 'name', {
+    value: Target.name,
+    writable: false,
+    configurable: true
+  });
 
   // Copy all prototype methods from Target to Decorated
   Object.getOwnPropertyNames(Target.prototype).forEach(name => {
