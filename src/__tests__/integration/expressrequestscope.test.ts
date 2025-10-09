@@ -89,7 +89,7 @@ const startExpressServer = async () => {
             const userId = (req.headers['x-user-id'] as string) || 'anonymous';
             const requestId = (req.headers['x-request-id'] as string) || 'req-' + Math.random().toString(36).substring(2, 15);
 
-            const userContext = new UserContext(
+            new UserContext(
                 { 
                     userId: userId,
                     requestId: requestId
@@ -189,7 +189,7 @@ const testUserContextPerRequest = async () => {
 }
 
 const testReturnSameInstanceWithinSingleRequest = async () => {
-    console.log('Starting textReturnSameInstanceWithinSingleRequest: Same instance within a request');
+    console.log('Starting testReturnSameInstanceWithinSingleRequest: Same instance within a request');
     console.log('----------------------------------------------\n');
 
     const response = await localFetch(
