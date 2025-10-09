@@ -26,7 +26,7 @@ import {
  * const instance = new MyService() as MyService & Component;
  * instance.getScope(); // Now TypeScript knows about this
  */
-function Singleton<T, C extends new(...a:any[]) => T>(Target: C): C {
+const Singleton = <T, C extends new(...a:any[]) => T>(Target: C): C => {
   // Create a new class that extends SingletonComponent
   const Decorated = class extends SingletonComponent {
     constructor(...args: any[]) {
@@ -131,7 +131,7 @@ function Singleton<T, C extends new(...a:any[]) => T>(Target: C): C {
  * const instance = new UserContext('user-123') as UserContext & Component;
  * instance.getScope(); // Returns 'REQUEST'
  */
-function Request<T, C extends new(...a:any[]) => T>(Target: C): C {
+const Request = <T, C extends new(...a:any[]) => T>(Target: C): C => {
   // Create a new class that extends RequestComponent
   const Decorated = class extends RequestComponent {
     constructor(...args: any[]) {
