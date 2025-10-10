@@ -36,7 +36,7 @@ type Constructor<T = any> = new (...args: any[]) => T;
  * service.doWork(); // Works! Logger is injected
  */
 const Insert = <T>(type: Constructor<T>, optional: boolean = false) => {
-    return function<This, Value extends T>(
+    return function<This, Value>(
         target: undefined,
         context: ClassFieldDecoratorContext<This, Value>
     ) {
