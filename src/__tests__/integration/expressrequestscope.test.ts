@@ -3,6 +3,7 @@ import { strict as assert } from 'node:assert';
 import { Request as RequestScoped } from '@/scopes/scopes';
 import { getApplicationContext, initializeRequestContext } from '@/application-context/application_context';
 import { Component, Scope } from '@/building-blocks/component';
+import { Insert } from '@/building-blocks/assembler';
 
 const BASEURL = 'http://localhost';
 const PORT = 3456;
@@ -48,6 +49,24 @@ class RequestLogger {
     
     getLogs() {
         return this.logs;
+    }
+}
+
+@RequestScoped
+class RequestMetadata {
+
+    @Insert(UserContext)
+    userContext!: UserContext;
+
+    @Insert(RequestLogger)
+    logger!: RequestLogger;
+
+    getUserContext() {
+        return this.userContext;
+    }
+
+    getLogger() {
+        return this.logger;
     }
 }
 
@@ -141,6 +160,20 @@ const startExpressServer = async () => {
             res.json({
                 logs: logger3.getLogs(),
                 sameInstance: logger1 === logger2 && logger2 === logger3
+            });
+        });
+
+        app.get('/meta', (req: Request, res: Response) => {
+            new UserContext();
+            new RequestLogger();
+            const metadata = new RequestMetadata() as RequestMetadata & Component;
+
+            console.log(`Metadata accessed`, metadata);
+            res.json({
+                userId: metadata.getUserContext().getUserId(),
+                requestId: metadata.getUserContext().getRequestId(),
+                logs: metadata.getLogger().getLogs(),
+                scope: metadata.getScope()
             });
         });
 
@@ -297,6 +330,28 @@ const testHandleConcurrentRequestsWithoutInterference = async () => {
     console.log('----------------------------------------------\n');
 };
 
+const testNestedRequestScopedComponents = async () => {
+    console.log('Starting testNestedRequestScopedComponents: Nested request-scoped components');
+    console.log('----------------------------------------------\n');
+    
+    const response = await localFetch(
+        BASEURL, PORT, '/meta', {
+            'x-user-id': 'user-789',
+            'x-request-id': '1337'
+        }
+    );
+
+    const data = await response.json();
+    console.log("Response:", data); // Should log userId, requestId, logs, scope
+
+    assert.equal(data.userId, 'user-789');
+    assert.equal(data.requestId, '1337');
+    assert.equal(data.scope, Scope.REQUEST);
+    assert.deepStrictEqual(data.logs, []); // No logs yet
+
+    console.log('✅ testNestedRequestScopedComponents passed');
+};
+
 (async function main() {
     try {
         // sync test
@@ -307,6 +362,7 @@ const testHandleConcurrentRequestsWithoutInterference = async () => {
         await testReturnSameInstanceWithinSingleRequest();
         await testReturnSameInstanceWithinMultipleRequest();
         await testHandleConcurrentRequestsWithoutInterference();
+        await testNestedRequestScopedComponents();
 
         console.log("🎉 All integration tests passed");
     } catch (err) {
