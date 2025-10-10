@@ -26,7 +26,7 @@ import {
  * const instance = new MyService() as MyService & Component;
  * instance.getScope(); // Now TypeScript knows about this
  */
-function Singleton<T, C extends new(...a:any[]) => T>(Target: C): C {
+const Singleton = <T, C extends new(...a:any[]) => T>(Target: C): C => {
   // Create a new class that extends SingletonComponent
   const Decorated = class extends SingletonComponent {
     constructor(...args: any[]) {
@@ -48,6 +48,13 @@ function Singleton<T, C extends new(...a:any[]) => T>(Target: C): C {
       setApplicationContext(this as unknown as Component, Decorated as any);
     }
   };
+
+  // Set the class name to match the original Target
+  Object.defineProperty(Decorated, 'name', {
+    value: Target.name,
+    writable: false,
+    configurable: true
+  });
 
   // Copy all prototype methods from Target to Decorated
   // This ensures methods defined in Target are available
@@ -131,7 +138,7 @@ function Singleton<T, C extends new(...a:any[]) => T>(Target: C): C {
  * const instance = new UserContext('user-123') as UserContext & Component;
  * instance.getScope(); // Returns 'REQUEST'
  */
-function Request<T, C extends new(...a:any[]) => T>(Target: C): C {
+const Request = <T, C extends new(...a:any[]) => T>(Target: C): C => {
   // Create a new class that extends RequestComponent
   const Decorated = class extends RequestComponent {
     constructor(...args: any[]) {
@@ -152,6 +159,13 @@ function Request<T, C extends new(...a:any[]) => T>(Target: C): C {
       setApplicationContext(this as unknown as Component, Decorated as any);
     }
   };
+
+  // Set the class name to match the original Target
+  Object.defineProperty(Decorated, 'name', {
+    value: Target.name,
+    writable: false,
+    configurable: true
+  });
 
   // Copy all prototype methods from Target to Decorated
   Object.getOwnPropertyNames(Target.prototype).forEach(name => {
