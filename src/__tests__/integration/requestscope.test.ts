@@ -1,5 +1,5 @@
 import { Request } from "@/scopes/scopes";
-import { initializeRequestContext, hasRequestContext } from "@/application-context/application_context";
+import { initializeRequestContext, hasRequestContext, getApplicationContext } from "@/application-context/application_context";
 import { Component } from "@/building-blocks/component";
 
 @Request
@@ -42,6 +42,24 @@ class UserContext {
     
     static resetCount() {
         UserContext.instanceCount = 0;
+    }
+}
+
+@Request('support')
+class QualifiedDummyRequest {
+    public name: string;
+    public instanceId: number;
+    private static instanceCount = 0;
+
+    constructor(name?: string) {
+        QualifiedDummyRequest.instanceCount++;
+        this.instanceId = QualifiedDummyRequest.instanceCount;
+        this.name = name || "QualifiedDummyRequestInstance";
+        console.log(`  → QualifiedDummyRequest constructor called (instance #${this.instanceId}, name: ${this.name})`);
+    }
+
+    static resetCount() {
+        QualifiedDummyRequest.instanceCount = 0;
     }
 }
 
@@ -269,6 +287,59 @@ const testAsyncOperations = async () => {
     console.log('✅ Test 8 passed\n');
 };
 
+const testQualifierSeparation = () => {
+    console.log('📋 Test 9: Qualifiers isolate request-scoped instances');
+
+    DummyRequest.resetCount();
+    QualifiedDummyRequest.resetCount();
+
+    initializeRequestContext(() => {
+        console.log('Inside qualifier test scope...');
+
+        const defaultA = new DummyRequest("default");
+        const defaultB = new DummyRequest("default-again");
+
+        const qualifiedA = new QualifiedDummyRequest("support-1");
+        const qualifiedB = new QualifiedDummyRequest("support-2");
+
+        if (defaultA === defaultB) {
+            console.log('✅ Default qualifier returns same instance within scope');
+        } else {
+            throw new Error('❌ Default qualifier did not reuse instance');
+        }
+
+        if (qualifiedA === qualifiedB) {
+            console.log('✅ Named qualifier returns same instance within scope');
+        } else {
+            throw new Error('❌ Named qualifier did not reuse instance');
+        }
+
+        if (!Object.is(defaultA, qualifiedA)) {
+            console.log('✅ Default and named qualifiers keep separate instances');
+        } else {
+            throw new Error('❌ Qualifiers leaked between instances');
+        }
+
+        const contextDefault = getApplicationContext(DummyRequest);
+        const contextQualifiedDefault = getApplicationContext(QualifiedDummyRequest);
+        const contextQualifiedNamed = getApplicationContext(QualifiedDummyRequest, 'support');
+
+        if (!contextQualifiedDefault) {
+            console.log('✅ No qualified instance stored under default qualifier');
+        } else {
+            throw new Error('❌ Qualified instance should not be accessible without qualifier');
+        }
+
+        if (contextDefault === defaultA && contextQualifiedNamed === qualifiedA) {
+            console.log('✅ Context retrieval respects qualifier separation');
+        } else {
+            throw new Error('❌ Context retrieval mismatch for qualifiers');
+        }
+    });
+
+    console.log('✅ Test 9 passed\n');
+};
+
 
 (async function main() {
     try {
@@ -283,6 +354,7 @@ const testAsyncOperations = async () => {
         testComponentMethods();
         testNestedScopes();
         await testAsyncOperations();
+        testQualifierSeparation();
         
         console.log('\n' + '='.repeat(50));
         console.log("🎉 All integration tests passed!");

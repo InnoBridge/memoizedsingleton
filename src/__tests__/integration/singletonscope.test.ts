@@ -2,7 +2,7 @@ import { getApplicationContext } from "@/application-context/application_context
 import { Singleton } from "@/scopes/scopes";
 import { Component, SingletonComponent } from "@/building-blocks/component";
 
-@Singleton("dummySingleton")
+@Singleton
 class DummySingleton {
     public name: string;
     public instanceId: number;
@@ -13,6 +13,20 @@ class DummySingleton {
         this.instanceId = DummySingleton.instanceCount;
         this.name = "DummySingletonInstance";
         console.log(`  → DummySingleton constructor called (instance #${this.instanceId})`);
+    }
+}
+
+@Singleton('secondary')
+class QualifiedDummySingleton {
+    public tag: string;
+    public instanceId: number;
+    private static instanceCount = 0;
+
+    constructor() {
+        QualifiedDummySingleton.instanceCount++;
+        this.instanceId = QualifiedDummySingleton.instanceCount;
+        this.tag = "QualifiedDummySingleton";
+        console.log(`  → QualifiedDummySingleton constructor called (instance #${this.instanceId})`);
     }
 }
 
@@ -106,15 +120,54 @@ const testClearingContext = () => {
     console.log(`  Instance from context after clear: ${instanceAfterClear}`);
 };
 
+const testQualifiedSingletons = () => {
+    console.log('\n📋 Test 5: Qualifier support maintains separate instances');
+
+    const defaultInstanceA = new DummySingleton();
+    const defaultInstanceB = new DummySingleton();
+    const qualifiedInstanceA = new QualifiedDummySingleton();
+    const qualifiedInstanceB = new QualifiedDummySingleton();
+
+    const sameDefault = defaultInstanceA === defaultInstanceB;
+    const sameQualified = qualifiedInstanceA === qualifiedInstanceB;
+    const isolated = !Object.is(defaultInstanceA, qualifiedInstanceA);
+
+    if (sameDefault && sameQualified && isolated) {
+        console.log('✅ Default and qualified singletons are isolated while remaining stable within their qualifier');
+    } else {
+        throw new Error('❌ Qualifier isolation failed for singleton instances');
+    }
+
+    const defaultFromContext = getApplicationContext(DummySingleton);
+    const qualifiedFromDefaultQualifier = getApplicationContext(QualifiedDummySingleton);
+    const qualifiedFromNamedQualifier = getApplicationContext(QualifiedDummySingleton, 'secondary');
+
+    if (!qualifiedFromDefaultQualifier) {
+        console.log('✅ No instance stored under default qualifier for QualifiedDummySingleton');
+    } else {
+        throw new Error('❌ Qualified singleton should not be retrievable without qualifier');
+    }
+
+    if (defaultFromContext === defaultInstanceA && qualifiedFromNamedQualifier === qualifiedInstanceA) {
+        console.log('✅ Context lookups respect qualifier separation');
+    } else {
+        throw new Error('❌ Context lookup mismatch for qualifier separation');
+    }
+
+    (defaultInstanceA as DummySingleton & Component).stop();
+    (qualifiedInstanceA as QualifiedDummySingleton & Component).stop();
+};
+
 (async function main() {
     try {
         console.log('🚀 Starting Singleton Integration Tests\n');
         console.log('='.repeat(50));
 
         testSingletonBehavior();
-        // testApplicationContext();
-        // testModifyingInstance();
-        // testClearingContext();
+        testApplicationContext();
+        testModifyingInstance();
+        testClearingContext();
+        testQualifiedSingletons();
         
         console.log('\n' + '='.repeat(50));
         console.log("🎉 All integration tests passed");

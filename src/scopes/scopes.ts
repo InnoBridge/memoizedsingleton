@@ -6,25 +6,31 @@ import {
 } from '@/building-blocks/component';
 
 /**
- * Singleton decorator - makes the target class extend SingletonComponent
- * and ensures only one instance exists. The SingletonComponent constructor
- * will be called, setting scope = 'SINGLETON'.
- * 
- * Note: Due to TypeScript limitations, the decorator cannot change the type
- * of the class at compile time. The instance will have Component methods at runtime,
- * but TypeScript won't know about them unless you use a type assertion:
- * 
- * @example
- * @Singleton
- * class MyService {
- *   constructor() {
- *     console.log('MyService created');
- *   }
- * }
- * 
- * // Type assertion needed to access Component methods:
- * const instance = new MyService() as MyService & Component;
- * instance.getScope(); // Now TypeScript knows about this
+ * Singleton decorator
+ * -------------------
+ * Makes the target class extend {@link SingletonComponent} so that only one instance
+ * exists application-wide. You can optionally associate the singleton with a qualifier,
+ * allowing multiple logical singletons per constructor.
+ *
+ * ```ts
+ * @Singleton // uses the default qualifier
+ * class DummySingleton {}
+ *
+ * @Singleton('secondary') // explicit qualifier
+ * class QualifiedSingleton {}
+ *
+ * const defaultInstance = new DummySingleton();
+ * const secondInstance = new QualifiedSingleton();
+ * // defaultInstance === new DummySingleton(); // true (same default qualifier)
+ * // secondInstance === new QualifiedSingleton(); // true (same 'secondary' qualifier)
+ * ```
+ *
+ * The qualifier argument is optional. `@Singleton` stores the instance under the default qualifier,
+ * while `@Singleton('name')` isolates instances per qualifier string.
+ *
+ * Note: TypeScript's decorator typing limitations mean the return type still appears as the
+ * original class. Cast to `DummySingleton & Component` if you need compile-time awareness of the
+ * {@link Component} mixin APIs.
  */
 function Singleton<T, C extends new(...a:any[]) => T>(qualifierOrTarget?: string | C): any {
   const decorate = (Target: C, qualifier?: string): C => {
@@ -88,113 +94,102 @@ function Singleton<T, C extends new(...a:any[]) => T>(qualifierOrTarget?: string
 }
 
 /**
- * Request decorator - makes the target class extend RequestComponent
- * and ensures one instance exists per request scope. The RequestComponent constructor
- * will be called, setting scope = 'REQUEST'.
- * 
- * Request-scoped instances are isolated per HTTP request (or other async context)
- * and are reused within the same request but not shared across different requests.
- * 
- * **Important:** You must initialize a request context using `initializeRequestContext`
- * before creating instances of REQUEST-scoped classes. In Express apps, this is typically
- * done in middleware that wraps request handlers.
- * 
- * Note: Due to TypeScript limitations, the decorator cannot change the type
- * of the class at compile time. The instance will have Component methods at runtime,
- * but TypeScript won't know about them unless you use a type assertion.
- * 
- * @example
- * import express from 'express';
- * import { initializeRequestContext, getApplicationContext } from '@/application-context/application_context';
- * 
- * // Define a request-scoped component
+ * Request decorator
+ * -----------------
+ * Extends the target class with {@link RequestComponent}, providing a single instance per
+ * request scope (using AsyncLocalStorage under the hood). Like {@link Singleton}, you can
+ * optionally supply a qualifier so multiple logical instances of the same constructor are
+ * isolated within a single request.
+ *
+ * ```ts
  * @Request
- * class UserContext {
- *   constructor(public userId?: string) {}
- *   
- *   getUserId() {
- *     return this.userId;
- *   }
+ * class DummyRequest {
+ *   constructor(public id?: string) {}
  * }
- * 
- * const app = express();
- * 
- * // Middleware to initialize request context
- * app.use((req, res, next) => {
- *   initializeRequestContext(() => {
- *     // Create request-scoped instance
- *     const userId = req.headers['x-user-id'] as string;
- *     new UserContext(userId);
- *     next();
- *   });
+ *
+ * @Request('admin')
+ * class AdminRequestContext {}
+ *
+ * @Request('guest')
+ * class GuestRequestContext {}
+ *
+ * initializeRequestContext(() => {
+ *   const defaultContext = new DummyRequest('default');
+ *   const adminContext = new AdminRequestContext('admin-1');
+ *   const guestContext = new GuestRequestContext('guest-1');
+ *
+ *   console.log(defaultContext === new DummyRequest('default')); // true
+ *   console.log(adminContext === new AdminRequestContext('admin-2')); // true
+ *   console.log(guestContext === new GuestRequestContext('guest-2')); // true
+ *   console.log(adminContext === guestContext); // false
  * });
- * 
- * // Route handler - reuses the same UserContext instance
- * app.get('/user', (req, res) => {
- *   const userContext = getApplicationContext(UserContext);
- *   res.json({ userId: userContext?.getUserId() });
- * });
- * 
- * // In Express middleware - initialize request context first
- * app.use((req, res, next) => {
- *   initializeRequestContext(() => {
- *     const userContext = new UserContext('user-123');
- *     next();
- *   });
- * });
- * 
- * // Type assertion needed to access Component methods:
- * const instance = new UserContext('user-123') as UserContext & Component;
- * instance.getScope(); // Returns 'REQUEST'
+ * ```
+ *
+ * Qualifiers behave the same way as with singletons, but the lifetime is bound to the active
+ * request context. Remember to call `initializeRequestContext` before using request-scoped components.
+ *
+ * TypeScript does not automatically reflect the {@link Component} methods on decorated classes;
+ * cast to `DummyRequest & Component` when you need compile-time access to the helper APIs.
  */
-const Request = <T, C extends new(...a:any[]) => T>(Target: C): C => {
-  // Create a new class that extends RequestComponent
-  const Decorated = class extends RequestComponent {
-    constructor(...args: any[]) {
-      // Check for existing instance in current request scope
-      const existing = getApplicationContext(Decorated as any);
-      if (existing) {
-        return existing as any;
+function Request<T, C extends new(...a:any[]) => T>(qualifierOrTarget?: string | C): any {
+  const decorate = (Target: C, qualifier?: string): C => {
+    // Create a new class that extends RequestComponent
+    const Decorated = class extends RequestComponent {
+      constructor(...args: any[]) {
+        // Check for existing instance in current request scope
+        const existing = getApplicationContext(Decorated as any, qualifier);
+        if (existing) {
+          return existing as any;
+        }
+
+        // Call RequestComponent constructor (sets scope = 'REQUEST')
+        super(...args);
+      
+        // Apply Target's constructor to initialize properties on this instance
+        const instance = Reflect.construct(Target, args, new.target);
+        Object.assign(this, instance);
+
+        // Store the request-scoped instance with qualifier information
+        setApplicationContext(this as unknown as Component, Decorated as any, qualifier);
       }
+    };
 
-      // Call RequestComponent constructor (sets scope = 'REQUEST')
-      super(...args);
-    
-      // Apply Target's constructor to initialize properties on this instance
-      const instance = Reflect.construct(Target, args, new.target);
-      Object.assign(this, instance);
+    // Set the class name to match the original Target
+    Object.defineProperty(Decorated, 'name', {
+      value: Target.name,
+      writable: false,
+      configurable: true
+    });
 
-      // Store the request-scoped instance
-      setApplicationContext(this as unknown as Component, Decorated as any);
-    }
+    // Copy all prototype methods from Target to Decorated
+    Object.getOwnPropertyNames(Target.prototype).forEach(name => {
+      if (name === 'constructor') return;
+      const descriptor = Object.getOwnPropertyDescriptor(Target.prototype, name);
+      if (descriptor) {
+        Object.defineProperty(Decorated.prototype, name, descriptor);
+      }
+    });
+
+    // Copy static properties from Target
+    Object.getOwnPropertyNames(Target).forEach(name => {
+      if (['prototype', 'name', 'length'].includes(name)) return;
+      const descriptor = Object.getOwnPropertyDescriptor(Target, name);
+      if (descriptor) {
+        Object.defineProperty(Decorated, name, descriptor);
+      }
+    });
+
+    return Decorated as any as C;
   };
 
-  // Set the class name to match the original Target
-  Object.defineProperty(Decorated, 'name', {
-    value: Target.name,
-    writable: false,
-    configurable: true
-  });
+  // Direct usage: @Request
+  if (typeof qualifierOrTarget === 'function') {
+    return decorate(qualifierOrTarget as C);
+  }
 
-  // Copy all prototype methods from Target to Decorated
-  Object.getOwnPropertyNames(Target.prototype).forEach(name => {
-    if (name === 'constructor') return;
-    const descriptor = Object.getOwnPropertyDescriptor(Target.prototype, name);
-    if (descriptor) {
-      Object.defineProperty(Decorated.prototype, name, descriptor);
-    }
-  });
-
-  // Copy static properties from Target
-  Object.getOwnPropertyNames(Target).forEach(name => {
-    if (['prototype', 'name', 'length'].includes(name)) return;
-    const descriptor = Object.getOwnPropertyDescriptor(Target, name);
-    if (descriptor) {
-      Object.defineProperty(Decorated, name, descriptor);
-    }
-  });
-
-  return Decorated as any as C;
+  // Factory usage: @Request() or @Request('qualifier')
+  const qualifier = qualifierOrTarget;
+  return (Target: C): C => decorate(Target, qualifier);
 }
 
 
