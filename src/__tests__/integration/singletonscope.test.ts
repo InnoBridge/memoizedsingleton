@@ -155,7 +155,7 @@ const testQualifiedSingletons = () => {
     }
 
     (defaultInstanceA as DummySingleton & Component).stop();
-    (qualifiedInstanceA as QualifiedDummySingleton & Component).stop();
+    (qualifiedInstanceA as QualifiedDummySingleton & Component).stop('secondary');
 };
 
 (async function main() {

@@ -77,6 +77,7 @@ const setApplicationContext = (instance: Component, constructorRef?: Constructor
         default:
             throw new Error(`Unsupported scope: ${instance.getScope()}`);
     }
+
 };
 
 /**
@@ -145,7 +146,6 @@ const removeComponentFromApplicationContext = (className: Constructor, qualifier
             }
             const qualifierMap = requestMap.get(className);
             qualifierMap?.delete(qual);
-            // If qualifier map is now empty, remove the className key
             if (qualifierMap && qualifierMap.size === 0) {
                 requestMap.delete(className);
             }
@@ -154,7 +154,6 @@ const removeComponentFromApplicationContext = (className: Constructor, qualifier
         case Scope.SINGLETON: {
             const qualifierMap = contextSingletonContainer.get(className);
             qualifierMap?.delete(qual);
-            // If qualifier map is now empty, remove the className key
             if (qualifierMap && qualifierMap.size === 0) {
                 contextSingletonContainer.delete(className);
             }
