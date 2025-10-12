@@ -51,7 +51,6 @@ const initializeRequestContext = <T>(callback: () => T): T => {
 const setApplicationContext = (instance: Component, constructorRef?: Constructor, qualifier?: string): void => {
     const className = constructorRef || (instance.constructor as Constructor);
     const qual = qualifier || DEFAULT_QUALIFIER;
-    console.log("Qualifier: ", qual);
     switch (instance.getScope()) {
         case Scope.SINGLETON: {
             let qualifierMap = contextSingletonContainer.get(className);
@@ -60,7 +59,6 @@ const setApplicationContext = (instance: Component, constructorRef?: Constructor
                 contextSingletonContainer.set(className, qualifierMap);
             }
             qualifierMap.set(qual, instance);
-            console.log('contextMap after setting singleton:', contextSingletonContainer);
             break;
         }
         case Scope.REQUEST: {
