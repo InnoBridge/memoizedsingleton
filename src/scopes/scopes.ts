@@ -26,12 +26,27 @@ import {
  * const instance = new MyService() as MyService & Component;
  * instance.getScope(); // Now TypeScript knows about this
  */
-const Singleton = <T, C extends new(...a:any[]) => T>(Target: C): C => {
+function Singleton<T, C extends new(...a:any[]) => T>(qualifierOrTarget?: string | C): any {
+  // Check if this is direct usage (@Singleton) or factory usage (@Singleton() / @Singleton('name'))
+  if (typeof qualifierOrTarget === 'function') {
+    // Direct usage: @Singleton
+    const Target = qualifierOrTarget as C;
+    return createSingletonClass(Target, undefined);
+  }
+  
+  // Factory usage: @Singleton() or @Singleton('qualifier')
+  const qualifier = qualifierOrTarget;
+  return function(Target: C): C {
+    return createSingletonClass(Target, qualifier);
+  };
+}
+
+function createSingletonClass<T, C extends new(...a:any[]) => T>(Target: C, qualifier?: string): C {
   // Create a new class that extends SingletonComponent
   const Decorated = class extends SingletonComponent {
     constructor(...args: any[]) {
       // Check for existing singleton instance first
-      const existing = getApplicationContext(Decorated as any);
+      const existing = getApplicationContext(Decorated as any, qualifier);
       if (existing) {
         return existing as any;
       }
@@ -40,12 +55,11 @@ const Singleton = <T, C extends new(...a:any[]) => T>(Target: C): C => {
       super(...args);
 
       // Apply Target's constructor to initialize properties on this instance
-      // We use Object.assign to copy the result of constructing Target onto this
       const instance = Reflect.construct(Target, args, new.target);
       Object.assign(this, instance);
 
-      // Store the singleton instance
-      setApplicationContext(this as unknown as Component, Decorated as any);
+      // Store the singleton instance with qualifier
+      setApplicationContext(this as unknown as Component, Decorated as any, qualifier);
     }
   };
 
@@ -57,7 +71,6 @@ const Singleton = <T, C extends new(...a:any[]) => T>(Target: C): C => {
   });
 
   // Copy all prototype methods from Target to Decorated
-  // This ensures methods defined in Target are available
   Object.getOwnPropertyNames(Target.prototype).forEach(name => {
     if (name === 'constructor') return;
     const descriptor = Object.getOwnPropertyDescriptor(Target.prototype, name);
@@ -66,7 +79,7 @@ const Singleton = <T, C extends new(...a:any[]) => T>(Target: C): C => {
     }
   });
 
-  // Copy static properties from Target (like static instanceCount)
+  // Copy static properties from Target
   Object.getOwnPropertyNames(Target).forEach(name => {
     if (['prototype', 'name', 'length'].includes(name)) return;
     const descriptor = Object.getOwnPropertyDescriptor(Target, name);
@@ -76,7 +89,7 @@ const Singleton = <T, C extends new(...a:any[]) => T>(Target: C): C => {
   });
 
   return Decorated as any as C;
-};
+}
 
 /**
  * Request decorator - makes the target class extend RequestComponent
@@ -138,12 +151,27 @@ const Singleton = <T, C extends new(...a:any[]) => T>(Target: C): C => {
  * const instance = new UserContext('user-123') as UserContext & Component;
  * instance.getScope(); // Returns 'REQUEST'
  */
-const Request = <T, C extends new(...a:any[]) => T>(Target: C): C => {
+function Request<T, C extends new(...a:any[]) => T>(qualifierOrTarget?: string | C): any {
+  // Check if this is direct usage (@Request) or factory usage (@Request() / @Request('name'))
+  if (typeof qualifierOrTarget === 'function') {
+    // Direct usage: @Request
+    const Target = qualifierOrTarget as C;
+    return createRequestClass(Target, undefined);
+  }
+  
+  // Factory usage: @Request() or @Request('qualifier')
+  const qualifier = qualifierOrTarget;
+  return function(Target: C): C {
+    return createRequestClass(Target, qualifier);
+  };
+}
+
+function createRequestClass<T, C extends new(...a:any[]) => T>(Target: C, qualifier?: string): C {
   // Create a new class that extends RequestComponent
   const Decorated = class extends RequestComponent {
     constructor(...args: any[]) {
       // Check for existing instance in current request scope
-      const existing = getApplicationContext(Decorated as any);
+      const existing = getApplicationContext(Decorated as any, qualifier);
       if (existing) {
         return existing as any;
       }
@@ -155,8 +183,8 @@ const Request = <T, C extends new(...a:any[]) => T>(Target: C): C => {
       const instance = Reflect.construct(Target, args, new.target);
       Object.assign(this, instance);
 
-      // Store the request-scoped instance
-      setApplicationContext(this as unknown as Component, Decorated as any);
+      // Store the request-scoped instance with qualifier
+      setApplicationContext(this as unknown as Component, Decorated as any, qualifier);
     }
   };
 

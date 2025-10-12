@@ -8,11 +8,17 @@ type Constructor<T = any> = new (...args: any[]) => T;
  * 
  * @param type - The constructor/class to inject from the application context
  * @param optional - If true, returns undefined when not found instead of throwing (default: false)
+ * @param qualifier - Optional qualifier to retrieve a specific instance
  * 
  * @example
- * @Singleton
+ * @Singleton()
  * class Logger {
  *   log(msg: string) { console.log(msg); }
+ * }
+ * 
+ * @Singleton({ qualifier: 'primary' })
+ * class DatabaseConnection {
+ *   constructor(public url: string) {}
  * }
  * 
  * class MyService {
@@ -22,20 +28,29 @@ type Constructor<T = any> = new (...args: any[]) => T;
  *   @Insert(Logger, true)
  *   optionalLogger?: Logger;  // Optional - returns undefined if not found
  *   
+ *   @Insert(DatabaseConnection, false, 'primary')
+ *   primaryDb!: DatabaseConnection;  // Injects the qualified instance
+ *   
  *   doWork() {
  *     this.logger.log('Working...');
  *     this.optionalLogger?.log('Optional works too!');
+ *     this.primaryDb.url; // Access primary database
  *   }
  * }
  * 
  * // Create the singleton first
  * new Logger();
+ * new DatabaseConnection('primary-url');
  * 
- * // Then use MyService - logger will be auto-injected
+ * // Then use MyService - dependencies will be auto-injected
  * const service = new MyService();
- * service.doWork(); // Works! Logger is injected
+ * service.doWork(); // Works! Dependencies are injected
  */
-const Insert = <T>(type: Constructor<T>, optional: boolean = false) => {
+const Insert = <T>(
+    type: Constructor<T>, 
+    optional: boolean = false,
+    qualifier?: string
+) => {
     return function<This, Value>(
         target: undefined,
         context: ClassFieldDecoratorContext<This, Value>
@@ -45,11 +60,12 @@ const Insert = <T>(type: Constructor<T>, optional: boolean = false) => {
         // Use addInitializer to eagerly resolve and inject dependency at construction time
         context.addInitializer(function(this: This) {
             // Resolve dependency immediately during construction
-            const instance = getApplicationContext(type);
+            const instance = getApplicationContext(type, qualifier);
             
             if (!instance && !optional) {
+                const qualifierMsg = qualifier ? ` with qualifier '${qualifier}'` : '';
                 throw new Error(
-                    `Failed to inject ${String(fieldName)}: No instance of ${type?.name || 'unknown'} found in application context. ` +
+                    `Failed to inject ${String(fieldName)}: No instance of ${type?.name || 'unknown'}${qualifierMsg} found in application context. ` +
                     `Make sure the dependency is decorated with @Singleton or @Request and has been instantiated.`
                 );
             }
