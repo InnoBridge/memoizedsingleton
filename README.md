@@ -7,6 +7,7 @@
 1. [Overview](#overview)
 2. [Decorators](#decorators)
 	 - [`@Singleton`](#singleton)
+	 - [`@Prototype`](#prototype)
 	 - [`@Request`](#request)
 	 - [`@Insert`](#insert)
 3. [Qualifier Model](#qualifier-model)
@@ -41,6 +42,57 @@ const secondary = new SecondaryCache();
 console.log(cacheA === cacheB);    // true
 console.log(cacheA === secondary); // false
 ```
+
+### `@Prototype`
+
+Returns a brand-new instance every time you construct the decorated class while still letting
+the container inject collaborators and apply lifecycle hooks. Prototype instances are never cached
+in the application context, so each resolution is isolated.
+
+Use `@Prototype` when you need container-managed wiring on short-lived objects:
+
+- The instance holds per-invocation state (for example, a job processor or calculation helper).
+- You want to keep using `@Insert`/qualifiers/AOP on that object without manually passing every dependency into its constructor.
+- You still want access to the shared `Component` helpers (`getScope()`, `replace`, etc.) for debugging or testing.
+
+If the class has no dependencies and no container features, a plain `new` without `@Prototype` is simpler.
+
+A common pattern is to instantiate a prototype inside a longer-lived component while still letting the container satisfy the prototype's dependencies:
+
+```ts
+import { Prototype, Singleton } from '@/scopes/scopes';
+import { Insert } from '@/building-blocks/assembler';
+
+type JobPayload = { id: string };
+
+@Singleton
+class Logger {
+	log(message: string) {
+		console.log(`[logger] ${message}`);
+	}
+}
+
+@Prototype
+class TransientJob {
+	@Insert(Logger)
+	private logger!: Logger;
+
+	handle(payload: JobPayload) {
+		this.logger.log(`Processing ${payload.id}`);
+		// ... stateful work lives only for this invocation
+	}
+}
+
+@Singleton
+class JobRunner {
+	run(payload: JobPayload) {
+		const job = new TransientJob(); // fresh instance every run
+		job.handle(payload);
+	}
+}
+```
+
+Here `TransientJob` receives its collaborators via `@Insert` just like a singleton would, yet every `JobRunner.run` call gets an isolated `TransientJob` instance with its own temporary state.
 
 ### `@Request`
 
@@ -106,6 +158,8 @@ const defaultLogger = getApplicationContext(Logger);              // default qua
 const secondaryLogger = getApplicationContext(Logger, 'secondary');
 ```
 
+Prototype-scoped components are not cached in the container, so there is no dedicated cache for them, so `getApplicationContext(TransientWorker)` returns `undefined`.
+
 ## Nested Components
 
 Components can depend on other components through `@Insert`, regardless of scope. For example, a singleton can inject another singleton and a request scoped component can inject a qualified service.
@@ -143,7 +197,7 @@ Every decorated instance inherits lifecycle utilities from `Component`:
 
 | Method | Description |
 | ------ | ----------- |
-| `getScope()` | Returns `SINGLETON` or `REQUEST`, useful for debugging and assertions. |
+| `getScope()` | Returns `SINGLETON`, `PROTOTYPE`, or `REQUEST`, useful for debugging and assertions. |
 | `stop(qualifier?)` | Removes the current instance from the cache. The optional qualifier lets you target a specific entry. |
 | `replace(newInstance, qualifier?)` | Swaps the cached instance with `newInstance` (optionally for a qualifier) and returns it. Handy for hot swapping in tests. |
 
@@ -162,6 +216,8 @@ console.log(altCache === cache);   // false — new instance stored
 ### Storage Model
 
 The framework maintains separate caches for singleton and request-scoped components using a nested map structure:
+
+> Prototype-scoped components bypass these caches entirely; they are constructed on demand and discarded when no longer referenced.
 
 ```
 ┌─────────────────────────────────────────┐
@@ -226,6 +282,8 @@ flowchart TD
 </details>
 
 ![Resolution Flow](assets/resolution-flow.png)
+
+Prototype-scoped components are never cached, so there is no dedicated prototype cache. Each time a prototype dependency is injected, a new instance is created.
 
 ### Request Scope Lifecycle
 
@@ -313,4 +371,5 @@ npm run test:integration --file=expressrequestscope.test.ts
 npm run test:integration --file=insert.test.ts
 npm run test:integration --file=requestscope.test.ts
 npm run test:integration --file=singletonscope.test.ts
+npm run test:integration --file=prototypescope.test.ts
 ```
