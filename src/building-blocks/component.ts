@@ -19,18 +19,13 @@ class Component {
     return this.#scope;
   }
 
-  stop(): void {
-    removeComponentFromApplicationContext(this.constructor as Constructor);
+  stop(qualifier?: string): void {
+    removeComponentFromApplicationContext(this.constructor as Constructor, qualifier);
   }
 
-  replace<T extends Component>(this: T, newInstance: T): T {
-    // Remove the current instance from the context
-    removeComponentFromApplicationContext(this.constructor as Constructor);
-    
-    // Add the new instance to the context
-    setApplicationContext(newInstance, this.constructor as Constructor);
-    
-    // Return the new instance
+  replace<T extends Component>(this: T, newInstance: T, qualifier?: string): T {
+    removeComponentFromApplicationContext(this.constructor as Constructor, qualifier);
+    setApplicationContext(newInstance, this.constructor as Constructor, qualifier);
     return newInstance;
   }
 };

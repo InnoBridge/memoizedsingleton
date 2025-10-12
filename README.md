@@ -144,8 +144,8 @@ Every decorated instance inherits lifecycle utilities from `Component`:
 | Method | Description |
 | ------ | ----------- |
 | `getScope()` | Returns `SINGLETON` or `REQUEST`, useful for debugging and assertions. |
-| `stop()` | Removes the current instance from the cache. The next `new` call constructs and stores a replacement. |
-| `replace(newInstance)` | Swaps the cached instance with `newInstance` and returns it. Handy for hot swapping in tests. |
+| `stop(qualifier?)` | Removes the current instance from the cache. The optional qualifier lets you target a specific entry. |
+| `replace(newInstance, qualifier?)` | Swaps the cached instance with `newInstance` (optionally for a qualifier) and returns it. Handy for hot swapping in tests. |
 
 Example:
 
