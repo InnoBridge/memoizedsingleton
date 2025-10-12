@@ -3,8 +3,12 @@ import { Component, Scope } from '@/building-blocks/component';
 
 type Constructor<T = any> = new (...args: any[]) => T;
 
-const contextSingletonContainer = new Map<Constructor, Component>();
-const requestContextContainer = new AsyncLocalStorage<Map<Constructor, Component>>();
+// Nested Map structure: Constructor -> (qualifier -> instance)
+// This avoids string concatenation collisions and allows type-based lookups
+const contextSingletonContainer = new Map<Constructor, Map<string, Component>>();
+const requestContextContainer = new AsyncLocalStorage<Map<Constructor, Map<string, Component>>>();
+
+const DEFAULT_QUALIFIER = 'default';
 
 /**
  * Initializes a new request context and executes the provided callback within that context.
@@ -22,7 +26,7 @@ const requestContextContainer = new AsyncLocalStorage<Map<Constructor, Component
  * });
  */
 const initializeRequestContext = <T>(callback: () => T): T => {
-    const requestMap = new Map<Constructor, Component>();
+    const requestMap = new Map<Constructor, Map<string, Component>>();
     return requestContextContainer.run(requestMap, callback);
 };
 
@@ -32,6 +36,7 @@ const initializeRequestContext = <T>(callback: () => T): T => {
  *
  * @param instance - The component instance to store
  * @param constructorRef - Optional constructor reference. If omitted, uses instance.constructor
+ * @param qualifier - Optional qualifier to distinguish multiple instances of the same type
  * @throws Error if no active request scope exists for REQUEST-scoped components
  * @throws Error if the scope is unsupported
  * 
@@ -39,20 +44,36 @@ const initializeRequestContext = <T>(callback: () => T): T => {
  * const myService = new MyService();
  * setApplicationContext(myService);
  * 
+ * // With qualifier
+ * setApplicationContext(primaryDb, DatabaseConnection, 'primary');
+ * 
  */
-const setApplicationContext = (instance: Component, constructorRef?: Constructor): void => {
+const setApplicationContext = (instance: Component, constructorRef?: Constructor, qualifier?: string): void => {
     const className = constructorRef || (instance.constructor as Constructor);
+    const qual = qualifier || DEFAULT_QUALIFIER;
     switch (instance.getScope()) {
-        case Scope.SINGLETON:
-            contextSingletonContainer.set(className, instance);
+        case Scope.SINGLETON: {
+            let qualifierMap = contextSingletonContainer.get(className);
+            if (!qualifierMap) {
+                qualifierMap = new Map<string, Component>();
+                contextSingletonContainer.set(className, qualifierMap);
+            }
+            qualifierMap.set(qual, instance);
             break;
-        case Scope.REQUEST:
+        }
+        case Scope.REQUEST: {
             const requestMap = requestContextContainer.getStore();
             if (!requestMap) {
                 throw new Error('No active request scope. Make sure to call within withRequestScope().');
             }
-            requestMap.set(className, instance);
+            let qualifierMap = requestMap.get(className);
+            if (!qualifierMap) {
+                qualifierMap = new Map<string, Component>();
+                requestMap.set(className, qualifierMap);
+            }
+            qualifierMap.set(qual, instance);
             break;
+        }
         default:
             throw new Error(`Unsupported scope: ${instance.getScope()}`);
     }
@@ -62,6 +83,7 @@ const setApplicationContext = (instance: Component, constructorRef?: Constructor
  * Retrieves a component instance from the application context.
  * 
  * @param className - The constructor/class of the component to retrieve
+ * @param qualifier - Optional qualifier to retrieve a specific instance
  * @returns The component instance cast to the specified type with Component methods, or undefined if not found
  * @throws Error if the scope is unsupported
  * 
@@ -71,17 +93,26 @@ const setApplicationContext = (instance: Component, constructorRef?: Constructor
  *   myService.doSomething();
  * }
  * 
+ * // With qualifier
+ * const primaryDb = getApplicationContext(DatabaseConnection, 'primary');
+ * 
  */
-const getApplicationContext = <T>(className: Constructor<T>): (T & Component) | undefined => {
+const getApplicationContext = <T>(className: Constructor<T>, qualifier?: string): (T & Component) | undefined => {
+    const qual = qualifier || DEFAULT_QUALIFIER;
+    
     switch (className.prototype.getScope()) {
-        case Scope.REQUEST:
+        case Scope.REQUEST: {
             const requestMap = requestContextContainer.getStore();
             if (!requestMap) {
                 return undefined;
             }
-            return requestMap.get(className) as (T & Component) | undefined;
-        case Scope.SINGLETON:
-            return contextSingletonContainer.get(className) as (T & Component) | undefined;
+            const qualifierMap = requestMap.get(className);
+            return qualifierMap?.get(qual) as (T & Component) | undefined;
+        }
+        case Scope.SINGLETON: {
+            const qualifierMap = contextSingletonContainer.get(className);
+            return qualifierMap?.get(qual) as (T & Component) | undefined;
+        }
         default:
             throw new Error(`Unsupported scope: ${className.prototype.getScope()}`);
     }
@@ -94,23 +125,41 @@ const getApplicationContext = <T>(className: Constructor<T>): (T & Component) | 
  * (if one is active). Use this within `initializeRequestContext` for request-scoped components.
  * 
  * @param className - The constructor/class of the component to remove
+ * @param qualifier - Optional qualifier to remove a specific instance
  * 
  * @example
  * removeComponentFromApplicationContext(MyService);
  * 
+ * // With qualifier
+ * removeComponentFromApplicationContext(DatabaseConnection, 'primary');
+ * 
  */
-const removeComponentFromApplicationContext = (className: Constructor): void => {
+const removeComponentFromApplicationContext = (className: Constructor, qualifier?: string): void => {
+    const qual = qualifier || DEFAULT_QUALIFIER;
+    
     switch (className.prototype.getScope()) {
-        case Scope.REQUEST:
+        case Scope.REQUEST: {
             const requestMap = requestContextContainer.getStore();
             if (!requestMap) {
                 return;
             }
-            requestMap.delete(className);
+            const qualifierMap = requestMap.get(className);
+            qualifierMap?.delete(qual);
+            // If qualifier map is now empty, remove the className key
+            if (qualifierMap && qualifierMap.size === 0) {
+                requestMap.delete(className);
+            }
             break;
-        case Scope.SINGLETON:
-            contextSingletonContainer.delete(className);
+        }
+        case Scope.SINGLETON: {
+            const qualifierMap = contextSingletonContainer.get(className);
+            qualifierMap?.delete(qual);
+            // If qualifier map is now empty, remove the className key
+            if (qualifierMap && qualifierMap.size === 0) {
+                contextSingletonContainer.delete(className);
+            }
             break;
+        }
         default:
             throw new Error(`Unsupported scope: ${className.prototype.getScope()}`);
     }

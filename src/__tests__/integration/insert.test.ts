@@ -18,6 +18,13 @@ class TestSingleton2 {
     }
 }
 
+@Singleton('secondary')
+class QualifiedTestSingleton {
+    getQualifiedValue() {
+        return 'qualified-singleton-value';
+    }
+}
+
 class SingletonTestClass {
     @Insert(TestSingleton)
     testSingleton!: TestSingleton;  // Optional - could be undefined
@@ -99,11 +106,32 @@ class MixedOptionalRequiredClass {
     optional?: TestSingleton2;
 }
 
+class QualifiedSingletonInjectionClass {
+    @Insert(QualifiedTestSingleton, false, 'secondary')
+    qualified!: QualifiedTestSingleton;
+
+    getQualified() {
+        return this.qualified;
+    }
+}
+
+class MissingQualifierSingletonClass {
+    @Insert(QualifiedTestSingleton, false, 'missing')
+    missing!: QualifiedTestSingleton;
+}
+
 // Request-scoped dependency
 @Request
 class TestRequest {
     getValue() {
         return 'request-value';
+    }
+}
+
+@Request('admin')
+class QualifiedTestRequest {
+    getValue() {
+        return 'qualified-request-value';
     }
 }
 
@@ -113,6 +141,15 @@ class RequestInjectionClass {
 
     getRequest(): TestRequest {
         return this.testRequest;
+    }
+}
+
+class QualifiedRequestInjectionClass {
+    @Insert(QualifiedTestRequest, false, 'admin')
+    qualifiedRequest!: QualifiedTestRequest;
+
+    getQualifiedRequest(): QualifiedTestRequest {
+        return this.qualifiedRequest;
     }
 }
 
@@ -293,6 +330,33 @@ const testMixedOptionalRequired = () => {
     console.log("================================\n");
 };
 
+const testQualifiedSingletonInjection = () => {
+    console.log("\nTest Qualified Singleton injection \n");
+
+    assert.throws(() => {
+        new QualifiedSingletonInjectionClass();
+    }, /No instance of QualifiedTestSingleton/);
+    console.log('✅ Throws error when qualified singleton missing');
+
+    const qualifiedSingleton = new QualifiedTestSingleton() as QualifiedTestSingleton & Component;
+    const consumer = new QualifiedSingletonInjectionClass();
+    const injected = consumer.getQualified();
+
+    assert.equal(injected, qualifiedSingleton, "Qualified singleton injection did not match context instance");
+    assert.equal(injected.getQualifiedValue(), 'qualified-singleton-value');
+    console.log('✅ Qualified singleton injected successfully');
+
+    qualifiedSingleton.stop();
+
+    assert.throws(() => {
+        new MissingQualifierSingletonClass();
+    }, /No instance of QualifiedTestSingleton/);
+    console.log('✅ Mismatched qualifier still throws as expected');
+
+    console.log("🎉 testQualifiedSingletonInjection passed");
+    console.log("================================\n");
+};
+
 const testRequestScopedInjection = () => {
     console.log("\nTest Request-scoped injection \n");
 
@@ -332,6 +396,32 @@ const testRequestScopedInjection = () => {
     console.log('✅ Different request contexts are isolated');
 
     console.log("🎉 testRequestScopedInjection passed");
+    console.log("================================\n");
+};
+
+const testQualifiedRequestScopedInjection = () => {
+    console.log("\nTest Qualified Request-scoped injection \n");
+
+    assert.throws(() => {
+        new QualifiedRequestInjectionClass();
+    }, /QualifiedTestRequest/);
+    console.log('✅ Throws error when qualified request dependency missing');
+
+    initializeRequestContext(() => {
+        assert.throws(() => {
+            new QualifiedRequestInjectionClass();
+        }, /QualifiedTestRequest/);
+        console.log('✅ Even inside scope, dependency must be instantiated first');
+
+        new QualifiedTestRequest();
+        const consumer = new QualifiedRequestInjectionClass();
+        const injected = consumer.getQualifiedRequest();
+
+        assert.equal(injected.getValue(), 'qualified-request-value');
+        console.log('✅ Qualified request injected successfully once available');
+    });
+
+    console.log("🎉 testQualifiedRequestScopedInjection passed");
     console.log("================================\n");
 };
 
@@ -396,7 +486,9 @@ const testErrorMessages = () => {
         testNestedSingleton();
         testMultipleInjections();
         testMixedOptionalRequired();
+    testQualifiedSingletonInjection();
         testRequestScopedInjection();
+    testQualifiedRequestScopedInjection();
         testSingletonStability();
         testInheritanceChain();
         testErrorMessages();

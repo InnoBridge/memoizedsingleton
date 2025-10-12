@@ -70,6 +70,19 @@ class RequestMetadata {
     }
 }
 
+@RequestScoped('admin')
+class AdminUserContext {
+    constructor(public userId?: string, public requestId?: string) {}
+
+    getUserId() {
+        return this.userId;
+    }
+
+    getRequestId() {
+        return this.requestId;
+    }
+}
+
 const localFetch = async (
     baseUrl: string, 
     port: number, 
@@ -129,6 +142,26 @@ const startExpressServer = async () => {
                 userId: userContext.getUserId(),
                 requestId: userContext.getRequestId(),
                 scope: userContext.getScope()
+            });
+        });
+
+        app.get('/admin-user', (req: Request, res: Response) => {
+            const userId = (req.headers['x-user-id'] as string) || 'anonymous-admin';
+            const requestId = (req.headers['x-request-id'] as string) || 'admin-' + Math.random().toString(36).substring(2, 15);
+
+            new UserContext({ userId, requestId });
+            new AdminUserContext(userId, requestId);
+
+            const defaultContext = getApplicationContext(UserContext) as UserContext & Component;
+            const adminContext = getApplicationContext(AdminUserContext, 'admin') as AdminUserContext & Component;
+            const adminDefaultLookup = getApplicationContext(AdminUserContext);
+
+            res.json({
+                defaultUserId: defaultContext?.getUserId(),
+                adminUserId: adminContext?.getUserId(),
+                adminRequestId: adminContext?.getRequestId(),
+                scope: adminContext?.getScope(),
+                adminAvailableWithoutQualifier: Boolean(adminDefaultLookup)
             });
         });
 
@@ -292,24 +325,24 @@ const testHandleConcurrentRequestsWithoutInterference = async () => {
     console.log('Starting testHandleConcurrentRequestsWithoutInterference: Concurrent requests isolation');
     console.log('----------------------------------------------\n');
 
-        // Fire multiple requests concurrently
-        const requests = [
-            fetch(`http://localhost:${PORT}/user`, {
-                headers: { 'x-user-id': 'concurrent-1', 'x-request-id': 'req-c1' }
-            }),
-            fetch(`http://localhost:${PORT}/user`, {
-                headers: { 'x-user-id': 'concurrent-2', 'x-request-id': 'req-c2' }
-            }),
-            fetch(`http://localhost:${PORT}/user`, {
-                headers: { 'x-user-id': 'concurrent-3', 'x-request-id': 'req-c3' }
-            }),
-            fetch(`http://localhost:${PORT}/user`, {
-                headers: { 'x-user-id': 'concurrent-4', 'x-request-id': 'req-c4' }
-            }),
-            fetch(`http://localhost:${PORT}/user`, {
-                headers: { 'x-user-id': 'concurrent-5', 'x-request-id': 'req-c5' }
-            })
-        ];
+    // Fire multiple requests concurrently
+    const requests = [
+        fetch(`http://localhost:${PORT}/user`, {
+            headers: { 'x-user-id': 'concurrent-1', 'x-request-id': 'req-c1' }
+        }),
+        fetch(`http://localhost:${PORT}/user`, {
+            headers: { 'x-user-id': 'concurrent-2', 'x-request-id': 'req-c2' }
+        }),
+        fetch(`http://localhost:${PORT}/user`, {
+            headers: { 'x-user-id': 'concurrent-3', 'x-request-id': 'req-c3' }
+        }),
+        fetch(`http://localhost:${PORT}/user`, {
+            headers: { 'x-user-id': 'concurrent-4', 'x-request-id': 'req-c4' }
+        }),
+        fetch(`http://localhost:${PORT}/user`, {
+            headers: { 'x-user-id': 'concurrent-5', 'x-request-id': 'req-c5' }
+        })
+    ];
 
     const responses = await Promise.all(requests);
     const data = await Promise.all(responses.map(res => res.json()));
@@ -327,6 +360,33 @@ const testHandleConcurrentRequestsWithoutInterference = async () => {
     });
 
     console.log('✅ testHandleConcurrentRequestsWithoutInterference passed');
+    console.log('----------------------------------------------\n');
+};
+
+const testQualifierIsolationEndpoint = async () => {
+    console.log('Starting testQualifierIsolationEndpoint: Qualifier-specific request data');
+    console.log('----------------------------------------------\n');
+
+    const response = await localFetch(
+        BASEURL,
+        PORT,
+        '/admin-user',
+        {
+            'x-user-id': 'admin-user',
+            'x-request-id': 'admin-req-1'
+        }
+    );
+
+    const data = await response.json();
+    console.log('Response:', data);
+
+    assert.equal(data.defaultUserId, 'admin-user');
+    assert.equal(data.adminUserId, 'admin-user');
+    assert.equal(data.adminRequestId, 'admin-req-1');
+    assert.equal(data.scope, Scope.REQUEST);
+    assert.equal(data.adminAvailableWithoutQualifier, false);
+
+    console.log('✅ testQualifierIsolationEndpoint passed');
     console.log('----------------------------------------------\n');
 };
 
@@ -363,6 +423,7 @@ const testNestedRequestScopedComponents = async () => {
         await testReturnSameInstanceWithinMultipleRequest();
         await testHandleConcurrentRequestsWithoutInterference();
         await testNestedRequestScopedComponents();
+        await testQualifierIsolationEndpoint();
 
         console.log("🎉 All integration tests passed");
     } catch (err) {
