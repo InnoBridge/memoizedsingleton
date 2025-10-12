@@ -1,7 +1,8 @@
 import { getApplicationContext, setApplicationContext } from '@/application-context/application_context';
-import { 
-    Component, 
+import {
+    Component,
     SingletonComponent,
+    PrototypeComponent,
     RequestComponent
 } from '@/building-blocks/component';
 
@@ -91,6 +92,68 @@ function Singleton<T, C extends new(...a:any[]) => T>(qualifierOrTarget?: string
   // Factory usage: @Singleton() or @Singleton('qualifier')
   const qualifier = qualifierOrTarget;
   return (Target: C): C => decorate(Target, qualifier);
+}
+
+/**
+ * Prototype decorator
+ * -------------------
+ * Returns a new instance every time the decorated class is instantiated while still
+ * benefiting from the {@link Component} helper methods and the container's wiring.
+ *
+ * ```ts
+ * @Prototype
+ * class TransientHelper {
+ *   constructor(public id = crypto.randomUUID()) {}
+ * }
+ *
+ * const helperA = new TransientHelper();
+ * const helperB = new TransientHelper();
+ * console.log(helperA === helperB); // false
+ * ```
+ *
+ * Unlike {@link Singleton} and {@link Request}, prototype components are not cached in
+ * the application context, so `getApplicationContext()` will always return `undefined`.
+ */
+function Prototype<T, C extends new(...a:any[]) => T>(target?: C): any {
+  const decorate = (Target: C): C => {
+    const Decorated = class extends PrototypeComponent {
+      constructor(...args: any[]) {
+        super(...args);
+        const instance = Reflect.construct(Target, args, new.target);
+        Object.assign(this, instance);
+      }
+    };
+
+    Object.defineProperty(Decorated, 'name', {
+      value: Target.name,
+      writable: false,
+      configurable: true
+    });
+
+    Object.getOwnPropertyNames(Target.prototype).forEach(name => {
+      if (name === 'constructor') return;
+      const descriptor = Object.getOwnPropertyDescriptor(Target.prototype, name);
+      if (descriptor) {
+        Object.defineProperty(Decorated.prototype, name, descriptor);
+      }
+    });
+
+    Object.getOwnPropertyNames(Target).forEach(name => {
+      if (['prototype', 'name', 'length'].includes(name)) return;
+      const descriptor = Object.getOwnPropertyDescriptor(Target, name);
+      if (descriptor) {
+        Object.defineProperty(Decorated, name, descriptor);
+      }
+    });
+
+    return Decorated as any as C;
+  };
+
+  if (typeof target === 'function') {
+    return decorate(target as C);
+  }
+
+  return (Target: C): C => decorate(Target);
 }
 
 /**
@@ -195,5 +258,6 @@ function Request<T, C extends new(...a:any[]) => T>(qualifierOrTarget?: string |
 
 export {
     Singleton,
+    Prototype,
     Request
 };
