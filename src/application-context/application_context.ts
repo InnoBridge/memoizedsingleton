@@ -74,6 +74,9 @@ const setApplicationContext = (instance: Component, constructorRef?: Constructor
             qualifierMap.set(qual, instance);
             break;
         }
+        case Scope.PROTOTYPE:
+            // Prototype instances are intentionally not cached
+            break;
         default:
             throw new Error(`Unsupported scope: ${instance.getScope()}`);
     }
@@ -114,6 +117,9 @@ const getApplicationContext = <T>(className: Constructor<T>, qualifier?: string)
             const qualifierMap = contextSingletonContainer.get(className);
             return qualifierMap?.get(qual) as (T & Component) | undefined;
         }
+        case Scope.PROTOTYPE:
+            // Prototype components are not stored in the context
+            return undefined;
         default:
             throw new Error(`Unsupported scope: ${className.prototype.getScope()}`);
     }
@@ -159,6 +165,9 @@ const removeComponentFromApplicationContext = (className: Constructor, qualifier
             }
             break;
         }
+        case Scope.PROTOTYPE:
+            // Nothing to remove for prototype components
+            break;
         default:
             throw new Error(`Unsupported scope: ${className.prototype.getScope()}`);
     }
@@ -185,6 +194,9 @@ const clearApplicationContext = (scope: Scope): void => {
             if (requestMap) {
                 requestMap.clear();
             }
+            break;
+        case Scope.PROTOTYPE:
+            // Prototype components are not stored centrally
             break;
         default:
             throw new Error(`Unsupported scope: ${scope}`);

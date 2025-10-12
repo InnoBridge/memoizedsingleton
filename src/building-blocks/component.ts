@@ -2,7 +2,7 @@ import { removeComponentFromApplicationContext, setApplicationContext } from '@/
 
 enum Scope {
   SINGLETON = 'SINGLETON',
-  TRANSIENT = 'TRANSIENT',
+  PROTOTYPE = 'PROTOTYPE',
   REQUEST = 'REQUEST'
 };
 
@@ -41,6 +41,17 @@ class SingletonComponent extends Component {
   }
 };
 
+class PrototypeComponent extends Component {
+  constructor(args?: any) {
+    super();
+    this.setScope(Scope.PROTOTYPE);
+  }
+
+  getScope(): Scope | undefined {
+    return Scope.PROTOTYPE;
+  }
+};
+
 class RequestComponent extends Component {
   constructor(args?: any) {
     super();
@@ -55,6 +66,7 @@ class RequestComponent extends Component {
 export {
     Component,
     SingletonComponent,
+    PrototypeComponent,
     RequestComponent,
     Scope
 };
