@@ -1,16 +1,8 @@
 {
   "name": "@innobridge/memoizedsingleton",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "A TypeScript library for Dependency Injection",
   "author": "yilengyao <innobridgetechnology@gmail.com>",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/InnoBridge/memoizedsingleton.git"
-  },
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org",
-    "access": "public"
-  },
   "license": "InnoBridge",
   "type": "module",
   "main": "dist/index.cjs",
