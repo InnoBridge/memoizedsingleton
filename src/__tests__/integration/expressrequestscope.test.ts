@@ -4,41 +4,14 @@ import { Request as RequestScoped } from '@/scopes/scopes';
 import { getApplicationContext, initializeRequestContext } from '@/application-context/application_context';
 import { Component, Scope } from '@/building-blocks/component';
 import { Insert } from '@/building-blocks/assembler';
+import { UserMetadata, UserMetadataOptions } from '@/components/user_metadata';
+import { RequestMetadata as MetadataComponent } from '@/components/request_metadata';
+import { Authentication, AuthenticationMethod } from '@/components/authentication';
 
 const BASEURL = 'http://localhost';
 const PORT = 3456;
 
 // Define a request-scoped component
-@RequestScoped
-class UserContext {
-    public userId?: string;
-    public requestId?: string;
-
-    constructor(userMetadata?: {
-        userId?: string;
-        requestId?: string;
-    }) {
-        this.userId = userMetadata?.userId;
-        this.requestId = userMetadata?.requestId;
-    }
-
-    setUserId(id: string) {
-        this.userId = id;
-    }
-
-    getUserId() {
-        return this.userId;
-    }
-    
-    setRequestId(id: string) {
-        this.requestId = id;
-    }
-
-    getRequestId() {
-        return this.requestId;
-    }
-}
-
 @RequestScoped
 class RequestLogger {
     private logs: string[] = [];
@@ -52,34 +25,10 @@ class RequestLogger {
     }
 }
 
-@RequestScoped
-class RequestMetadata {
-
-    @Insert(UserContext)
-    userContext!: UserContext;
-
-    @Insert(RequestLogger)
-    logger!: RequestLogger;
-
-    getUserContext() {
-        return this.userContext;
-    }
-
-    getLogger() {
-        return this.logger;
-    }
-}
-
 @RequestScoped('admin')
-class AdminUserContext {
-    constructor(public userId?: string, public requestId?: string) {}
-
-    getUserId() {
-        return this.userId;
-    }
-
-    getRequestId() {
-        return this.requestId;
+class AdminUserMetadata extends UserMetadata {
+    constructor(options?: UserMetadataOptions) {
+        super(options);
     }
 }
 
@@ -116,51 +65,54 @@ const startExpressServer = async () => {
             });
         });
 
-        // Middleware to set up user context
+        // Middleware to set up request metadata
         app.use((req: Request, res: Response, next: NextFunction) => {
             const userId = (req.headers['x-user-id'] as string) || 'anonymous';
             const requestId = (req.headers['x-request-id'] as string) || 'req-' + Math.random().toString(36).substring(2, 15);
+            const authHeader = (req.headers['authorization'] as string) || '';
+            const isJwt = authHeader.startsWith('Bearer ');
 
-            new UserContext(
-                { 
-                    userId: userId,
-                    requestId: requestId
-                }
-            );
+            const authentication = new Authentication({
+                method: isJwt ? AuthenticationMethod.JWT : AuthenticationMethod.NONE,
+                isAuthenticated: isJwt,
+                jwt: isJwt ? authHeader.replace('Bearer ', '') : undefined
+            });
+
+            new MetadataComponent(requestId);
+            const metadata = getApplicationContext(MetadataComponent) as MetadataComponent & Component;
+            metadata.setRequestId(requestId);
+            metadata.userMetadata = new AdminUserMetadata({ userId, sessionId: `session-${userId}` });
+            metadata.authentication = authentication;
             next();
         });
 
         // Get user info endpoint
         app.get('/user', (req: Request, res: Response) => {
-            new UserContext();
-
-            const userContext = getApplicationContext(UserContext) as UserContext & Component;
-
-            console.log("userContext:", userContext);
+            const metadata = getApplicationContext(MetadataComponent) as MetadataComponent & Component;
+            const userMetadata = metadata.getUserMetadata();
+            const authMetadata = metadata.getAuthentication();
 
             res.json({
-                userId: userContext.getUserId(),
-                requestId: userContext.getRequestId(),
-                scope: userContext.getScope()
+                userId: userMetadata?.getUserId(),
+                requestId: metadata.getRequestId(),
+                scope: metadata.getScope(),
+                authMethod: authMetadata?.getMethod(),
+                jwt: authMetadata?.getJwt()
             });
         });
 
         app.get('/admin-user', (req: Request, res: Response) => {
-            const userId = (req.headers['x-user-id'] as string) || 'anonymous-admin';
-            const requestId = (req.headers['x-request-id'] as string) || 'admin-' + Math.random().toString(36).substring(2, 15);
+            const metadata = getApplicationContext(MetadataComponent) as MetadataComponent & Component;
 
-            new UserContext({ userId, requestId });
-            new AdminUserContext(userId, requestId);
-
-            const defaultContext = getApplicationContext(UserContext) as UserContext & Component;
-            const adminContext = getApplicationContext(AdminUserContext, 'admin') as AdminUserContext & Component;
-            const adminDefaultLookup = getApplicationContext(AdminUserContext);
+            const defaultMetadata = metadata.getUserMetadata();
+            const adminMetadata = getApplicationContext(AdminUserMetadata, 'admin') as AdminUserMetadata & Component;
+            const adminDefaultLookup = getApplicationContext(AdminUserMetadata);
 
             res.json({
-                defaultUserId: defaultContext?.getUserId(),
-                adminUserId: adminContext?.getUserId(),
-                adminRequestId: adminContext?.getRequestId(),
-                scope: adminContext?.getScope(),
+                defaultUserId: defaultMetadata?.getUserId(),
+                adminUserId: adminMetadata?.getUserId(),
+                adminSessionId: adminMetadata?.getSessionId(),
+                scope: adminMetadata?.getScope(),
                 adminAvailableWithoutQualifier: Boolean(adminDefaultLookup)
             });
         });
@@ -168,13 +120,14 @@ const startExpressServer = async () => {
         // Log and retrieve endpoint
         app.post('/log', (req: Request, res: Response) => {
             const logger = new RequestLogger() as RequestLogger & Component;
-            const userContext = new UserContext() as UserContext & Component;
+            const metadata = getApplicationContext(MetadataComponent) as MetadataComponent & Component;
+            const userMetadata = metadata.getUserMetadata();
 
-            logger.log(`User ${userContext.getUserId()} logged message: ${req.body?.message}`);
+            logger.log(`User ${userMetadata?.getUserId()} logged message: ${req.body?.message}`);
             
             res.json({
                 logs: logger.getLogs(),
-                userId: userContext.getUserId()
+                userId: userMetadata?.getUserId()
             });
         });
 
@@ -197,15 +150,16 @@ const startExpressServer = async () => {
         });
 
         app.get('/meta', (req: Request, res: Response) => {
-            new UserContext();
             new RequestLogger();
-            const metadata = new RequestMetadata() as RequestMetadata & Component;
+            const metadata = getApplicationContext(MetadataComponent) as MetadataComponent & Component;
+            const authMetadata = metadata.getAuthentication();
 
             console.log(`Metadata accessed`, metadata);
             res.json({
-                userId: metadata.getUserContext().getUserId(),
-                requestId: metadata.getUserContext().getRequestId(),
-                logs: metadata.getLogger().getLogs(),
+                userId: metadata.getUserMetadata()?.getUserId(),
+                requestId: metadata.getRequestId(),
+                authMethod: authMetadata?.getMethod(),
+                logs: getApplicationContext(RequestLogger)?.getLogs() ?? [],
                 scope: metadata.getScope()
             });
         });
@@ -245,10 +199,12 @@ const testUserContextPerRequest = async () => {
     assert.strictEqual(data1.userId, 'user-123');
     assert.strictEqual(data1.requestId, 'req-1');
     assert.strictEqual(data1.scope, Scope.REQUEST);
+    assert.strictEqual(data1.authMethod, AuthenticationMethod.NONE);
 
     assert.strictEqual(data2.userId, 'user-456');
     assert.strictEqual(data2.requestId, 'req-2');
     assert.strictEqual(data2.scope, Scope.REQUEST);
+    assert.strictEqual(data2.authMethod, AuthenticationMethod.NONE);
 
     console.log('✅ testUserContextPerRequest passed');
     console.log('----------------------------------------------\n');
@@ -347,16 +303,10 @@ const testHandleConcurrentRequestsWithoutInterference = async () => {
     const responses = await Promise.all(requests);
     const data = await Promise.all(responses.map(res => res.json()));
 
-    // Each response should have its own unique user ID
-    assert.equal(data[0].userId, 'concurrent-1');
-    assert.equal(data[1].userId, 'concurrent-2');
-    assert.equal(data[2].userId, 'concurrent-3');
-    assert.equal(data[3].userId, 'concurrent-4');
-    assert.equal(data[4].userId, 'concurrent-5');
-
-    // All should be REQUEST scope
-    data.forEach(d => {
+    data.forEach((d, index) => {
+        assert.equal(d.userId, `concurrent-${index + 1}`);
         assert.equal(d.scope, Scope.REQUEST);
+        assert.equal(d.authMethod, AuthenticationMethod.NONE);
     });
 
     console.log('✅ testHandleConcurrentRequestsWithoutInterference passed');
@@ -382,7 +332,7 @@ const testQualifierIsolationEndpoint = async () => {
 
     assert.equal(data.defaultUserId, 'admin-user');
     assert.equal(data.adminUserId, 'admin-user');
-    assert.equal(data.adminRequestId, 'admin-req-1');
+    assert.equal(data.adminSessionId, `session-admin-user`);
     assert.equal(data.scope, Scope.REQUEST);
     assert.equal(data.adminAvailableWithoutQualifier, false);
 
@@ -407,6 +357,7 @@ const testNestedRequestScopedComponents = async () => {
     assert.equal(data.userId, 'user-789');
     assert.equal(data.requestId, '1337');
     assert.equal(data.scope, Scope.REQUEST);
+    assert.equal(data.authMethod, AuthenticationMethod.NONE);
     assert.deepStrictEqual(data.logs, []); // No logs yet
 
     console.log('✅ testNestedRequestScopedComponents passed');
