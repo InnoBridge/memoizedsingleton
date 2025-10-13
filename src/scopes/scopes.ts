@@ -6,6 +6,33 @@ import {
     RequestComponent
 } from '@/building-blocks/component';
 
+const copyPrototypeChain = (
+  sourceProto: object,
+  targetProto: object,
+  stopProto: object
+) => {
+  const visited = new Set<string>();
+  let proto: any = sourceProto;
+
+  while (proto && proto !== stopProto && proto !== Object.prototype) {
+    for (const name of Object.getOwnPropertyNames(proto)) {
+      if (name === 'constructor') continue;
+      if (visited.has(name)) continue;
+
+      const descriptor = Object.getOwnPropertyDescriptor(proto, name);
+      if (!descriptor) continue;
+
+      if (!Object.prototype.hasOwnProperty.call(targetProto, name)) {
+        Object.defineProperty(targetProto, name, descriptor);
+      }
+
+      visited.add(name);
+    }
+
+    proto = Object.getPrototypeOf(proto);
+  }
+};
+
 /**
  * Singleton decorator
  * -------------------
@@ -63,14 +90,7 @@ function Singleton<T, C extends new(...a:any[]) => T>(qualifierOrTarget?: string
     configurable: true
   });
 
-  // Copy all prototype methods from Target to Decorated
-  Object.getOwnPropertyNames(Target.prototype).forEach(name => {
-    if (name === 'constructor') return;
-    const descriptor = Object.getOwnPropertyDescriptor(Target.prototype, name);
-    if (descriptor) {
-      Object.defineProperty(Decorated.prototype, name, descriptor);
-    }
-  });
+  copyPrototypeChain(Target.prototype, Decorated.prototype, SingletonComponent.prototype);
 
   // Copy static properties from Target (like static instanceCount)
   Object.getOwnPropertyNames(Target).forEach(name => {
@@ -130,13 +150,7 @@ function Prototype<T, C extends new(...a:any[]) => T>(target?: C): any {
       configurable: true
     });
 
-    Object.getOwnPropertyNames(Target.prototype).forEach(name => {
-      if (name === 'constructor') return;
-      const descriptor = Object.getOwnPropertyDescriptor(Target.prototype, name);
-      if (descriptor) {
-        Object.defineProperty(Decorated.prototype, name, descriptor);
-      }
-    });
+    copyPrototypeChain(Target.prototype, Decorated.prototype, PrototypeComponent.prototype);
 
     Object.getOwnPropertyNames(Target).forEach(name => {
       if (['prototype', 'name', 'length'].includes(name)) return;
@@ -224,14 +238,7 @@ function Request<T, C extends new(...a:any[]) => T>(qualifierOrTarget?: string |
       configurable: true
     });
 
-    // Copy all prototype methods from Target to Decorated
-    Object.getOwnPropertyNames(Target.prototype).forEach(name => {
-      if (name === 'constructor') return;
-      const descriptor = Object.getOwnPropertyDescriptor(Target.prototype, name);
-      if (descriptor) {
-        Object.defineProperty(Decorated.prototype, name, descriptor);
-      }
-    });
+    copyPrototypeChain(Target.prototype, Decorated.prototype, RequestComponent.prototype);
 
     // Copy static properties from Target
     Object.getOwnPropertyNames(Target).forEach(name => {
