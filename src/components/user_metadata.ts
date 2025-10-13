@@ -26,7 +26,6 @@ class UserMetadata {
   private sessionId?: string;
 
   constructor(options: UserMetadataOptions = {}) {
-    console.log('UserMetadata instantiated with options:', options);
     this.userId = options.userId;
     this.sessionId = options.sessionId;
   }
