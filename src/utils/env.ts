@@ -55,7 +55,7 @@ function parseDotEnv(dotEnvPath: string): void {
  *
  * Throws if the variable is not found.
  */
-const readEnv = (key: string): string => {
+const readEnv = (key: string, filePath?: string): string => {
   if (!key) throw new Error('Environment variable key must be provided');
 
   // Fast path: process.env
@@ -68,7 +68,7 @@ const readEnv = (key: string): string => {
   }
 
   // Resolve .env path once and parse it to populate the cache
-  const dotEnvPath = resolve(process.cwd(), '.env');
+  const dotEnvPath = resolve(process.cwd(), filePath || '.env');
   parseDotEnv(dotEnvPath);
 
   // Re-check the cache after parsing

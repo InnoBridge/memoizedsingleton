@@ -1,4 +1,4 @@
-import { readEnv, clearDotEnvCache } from '@/../utils/env';
+import { readEnv, clearDotEnvCache } from '@/utils/env';
 import assert from 'node:assert';
 
 const readFromDotEnvTest = () => {
