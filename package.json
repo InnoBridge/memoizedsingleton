@@ -1,6 +1,6 @@
 {
   "name": "@innobridge/memoizedsingleton",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "A TypeScript library for Dependency Injection",
   "author": "yilengyao <innobridgetechnology@gmail.com>",
   "repository": {
