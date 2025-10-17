@@ -12,6 +12,7 @@ import {
     clearApplicationContext,
     hasRequestContext
 } from '@/application-context/application_context';
+import { Insert } from '@/building-blocks/assembler';
 
 export {
     Singleton,
@@ -33,5 +34,6 @@ export {
     clearApplicationContext,
     hasRequestContext,
     Config,
-    getConfig
+    getConfig,
+    Insert
 };
