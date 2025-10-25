@@ -1,24 +1,39 @@
 # Memoized Singleton Decorators
 
-`@innobridge/memoirizedsingleton` is a lightweight dependency injection framework that caches decorated components and injects them by retrieving the cached instance. You define a component with a decorator, instantiate it once, and every subsequent resolution fetches the cached instance automatically.
+`@innobridge/memoizedsingleton` is a lightweight dependency injection framework that caches decorated components and injects them by retrieving the cached instance. You define a component with a decorator, instantiate it once, and every subsequent resolution fetches the cached instance automatically.
 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Decorators](#decorators)
+2. [Installation](#installation)
+3. [Decorators](#decorators)
 	 - [`@Singleton`](#singleton)
 	 - [`@Prototype`](#prototype)
 	 - [`@Request`](#request)
 	 - [`@Insert`](#insert)
-3. [Qualifier Model](#qualifier-model)
-4. [Nested Components](#nested-components)
-5. [Lifecycle APIs](#lifecycle-apis)
-6. [Architecture](#architecture)
-7. [Tests](#tests)
+4. [Qualifier Model](#qualifier-model)
+5. [Nested Components](#nested-components)
+6. [Lifecycle APIs](#lifecycle-apis)
+7. [Architecture](#architecture)
+8. [Tests](#tests)
 
 ## Overview
 
 The framework is purpose-built for modern TypeScript projects that want simple dependency wiring without metadata emit requirements. Decorators wrap a class so it automatically registers itself with the application context on first construction and reuses the stored instance on subsequent resolutions.
+
+## Installation
+
+Install the package from npm using your preferred package manager:
+
+```bash
+npm install @innobridge/memoizedsingleton
+# or
+pnpm add @innobridge/memoizedsingleton
+# or
+yarn add @innobridge/memoizedsingleton
+```
+
+The library targets Node.js 20 and newer, and ships ESM and CJS bundles, so it works out of the box in most modern TypeScript setups.
 
 ## Decorators
 
