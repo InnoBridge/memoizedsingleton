@@ -33,7 +33,7 @@ pnpm add @innobridge/memoizedsingleton
 yarn add @innobridge/memoizedsingleton
 ```
 
-The library targets Node.js 20+ (or any runtime that supports the Node 22 compatibility line) and ships ESM and CJS bundles, so it works out of the box in most modern TypeScript setups.
+The library targets Node.js 20 and newer, and ships ESM and CJS bundles, so it works out of the box in most modern TypeScript setups.
 
 ## Decorators
 
